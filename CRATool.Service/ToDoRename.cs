@@ -10,15 +10,33 @@ namespace CRATool.Service
     {
         public void Listening(TcpListener server, ILog log)
         {
+            var serverSideClient = server.AcceptTcpClient();
+            var serverSideClientStream = serverSideClient.GetStream();
+            var serverSideClientStreamReader = new StreamReader(serverSideClientStream);
+            var serverSideClientStreamWriter = new StreamWriter(serverSideClientStream);
+
+            var response = string.Empty;
+
             try
             {
-                var serverSideClient = server.AcceptTcpClient();
-                var serverSideClientStream = serverSideClient.GetStream();
-                var serverSideClientStreamReader = new StreamReader(serverSideClientStream);
-                var serverSideClientStreamWriter = new StreamWriter(serverSideClientStream);
-
-                string inputLine;
                 var request = new StringBuilder();
+
+                var inputLine = serverSideClientStreamReader.ReadLine();
+                if (string.IsNullOrEmpty(inputLine)) return;
+
+                if (!inputLine.EndsWith("HTTP/1.1"))
+                    throw new InvalidOperationException(Properties.Resources.Erreur_Protocole);
+
+                var method = inputLine.Split(' ')[0];
+                var uri = inputLine.Split(' ')[1];
+
+                if (string.IsNullOrEmpty(uri))
+                    throw new InvalidOperationException(string.Format(Properties.Resources.Erreur_Uri, uri));
+
+                if (string.IsNullOrEmpty(method))
+                    throw new InvalidOperationException(string.Format(Properties.Resources.Erreur_Methode, method));
+
+                request.AppendLine(inputLine);
 
                 while (!string.IsNullOrEmpty(inputLine = serverSideClientStreamReader.ReadLine()))
                 {
@@ -26,8 +44,15 @@ namespace CRATool.Service
                 }
                 log.Info($"RECIEVED REQUEST : {request}");
 
-                var response = GetResponsecontent(request);
-
+                response = CreateResponseText(200, "OK", GetSimpleResponseBody($"Uri={uri}"));
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex.Message, ex);
+                response = CreateResponseText(500, "ERREUR_INTERNE", "Une erreur est survenue");
+            }
+            finally
+            {
                 serverSideClientStreamWriter.Write(response);
                 serverSideClientStreamWriter.Flush();
 
@@ -35,37 +60,29 @@ namespace CRATool.Service
 
                 serverSideClient.Close();
             }
-            catch (Exception ex)
-            {
-                log.Error(ex.Message, ex);
-            }
         }
 
-        private static string GetResponsecontent(StringBuilder request)
+        private static string CreateResponseText(int statusCode, string statusMessage, string responseBody)
         {
-            var response = new StringBuilder("HTTP/1.1 200 OK");
+            var response = new StringBuilder($"HTTP/1.1 {statusCode} {statusMessage}");
             response.AppendLine();
             response.AppendLine();
-            response.AppendLine("<!DOCTYPE HTML PUBLIC \" -//IETF//DTD HTML 2.0//EN\">");
-            response.AppendLine("<http>");
-            response.AppendLine("<head>");
-            response.AppendLine("</head>");
-            response.AppendLine("<body>");
-            response.AppendLine($"<h2>Uri={GetUri(request.ToString())}</h2>");
-            response.AppendLine("</body>");
-            response.AppendLine("</http>");
+            response.AppendLine(responseBody);
             return response.ToString();
         }
 
-        private static string GetUri(string request)
+        private static string GetSimpleResponseBody(string simpleText)
         {
-            var byteArray = Encoding.UTF8.GetBytes(request);
-            var memStream = new MemoryStream(byteArray);
-            var streamReader = new StreamReader(memStream);
-            var requestLine = streamReader.ReadLine();
-            if (requestLine == null) return "";
-            var requestLineComponents = requestLine.Split(' ');
-            return requestLineComponents[1];
+            var body = new StringBuilder();
+            body.AppendLine("<!DOCTYPE HTML PUBLIC \" -//IETF//DTD HTML 2.0//EN\">");
+            body.AppendLine("<http>");
+            body.AppendLine("<head>");
+            body.AppendLine("</head>");
+            body.AppendLine("<body>");
+            body.AppendLine($"<h2>{simpleText}</h2>");
+            body.AppendLine("</body>");
+            body.AppendLine("</http>");
+            return body.ToString();
         }
     }
 }
