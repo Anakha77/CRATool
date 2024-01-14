@@ -41,9 +41,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="SousTypeActivite.cs" />
-    <Compile Include="TypeActivite.cs" />
-    <Compile Include="Utilisateur.cs" />
+    <Compile Include="ActivitySubType.cs" />
+    <Compile Include="ActivityType.cs" />
+    <Compile Include="User.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
